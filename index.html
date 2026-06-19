@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pro Prep Image</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="control-panel" aria-label="Image preparation controls">
+        <div class="brand">
+          <p class="eyebrow">Amazon Merch</p>
+          <h1>Pro Prep Image</h1>
+          <p>Batch prepare transparent PNGs for T-shirt uploads.</p>
+          <div class="build-row">
+            <span id="buildLabel">Build loading</span>
+            <button type="button" class="ghost-button" id="reloadButton">Reload latest</button>
+          </div>
+        </div>
+
+        <label class="upload-zone" id="dropZone">
+          <input id="fileInput" type="file" accept="image/png,image/jpeg,image/webp" multiple />
+          <span>Upload images</span>
+          <small>PNG, JPG, or WEBP. Files stay in this browser.</small>
+        </label>
+
+        <section class="panel-section" aria-labelledby="processingTitle">
+          <div class="section-heading">
+            <h2 id="processingTitle">Processing</h2>
+            <button type="button" class="ghost-button" id="resetButton">Reset settings</button>
+          </div>
+
+          <label class="toggle-row">
+            <input type="checkbox" id="upscaleToggle" />
+            <span>
+              <strong>Upscale</strong>
+              <small>Browser resize before cleanup</small>
+            </span>
+          </label>
+          <label class="field-row indented">
+            <span>Scale</span>
+            <select id="upscaleFactor">
+              <option value="2">2x</option>
+              <option value="4">4x</option>
+            </select>
+          </label>
+
+          <label class="toggle-row">
+            <input type="checkbox" id="removeBgToggle" checked />
+            <span>
+              <strong>Remove sampled color</strong>
+              <small>Samples all corners and removes that color everywhere</small>
+            </span>
+          </label>
+          <label class="slider-row indented">
+            <span>Color recovery <output id="toleranceValue">0%</output></span>
+            <input type="range" id="toleranceRange" min="0" max="100" step="1" value="0" />
+          </label>
+
+          <label class="toggle-row">
+            <input type="checkbox" id="edgeCleanupToggle" checked />
+            <span>
+              <strong>Edge cleanup</strong>
+              <small>Removes faint background haze</small>
+            </span>
+          </label>
+          <label class="slider-row indented">
+            <span>Edge color trim <output id="edgeTrimValue">4</output></span>
+            <input type="range" id="edgeTrimRange" min="1" max="20" step="1" value="4" />
+          </label>
+
+          <label class="toggle-row">
+            <input type="checkbox" id="trimToggle" checked />
+            <span>
+              <strong>Trim transparent excess</strong>
+              <small>Finds the visible artwork bounds</small>
+            </span>
+          </label>
+          <label class="slider-row indented">
+            <span>Trim margin <output id="trimMarginValue">0px</output></span>
+            <input type="range" id="trimMarginRange" min="0" max="300" step="10" value="0" />
+          </label>
+        </section>
+
+        <section class="panel-section" aria-labelledby="canvasTitle">
+          <div class="section-heading">
+            <h2 id="canvasTitle">Amazon Canvas</h2>
+            <span class="fixed-size">4500 × 5400</span>
+          </div>
+
+          <label class="toggle-row">
+            <input type="checkbox" id="repositionToggle" checked disabled />
+            <span>
+              <strong>Amazon-ready canvas</strong>
+              <small>Always exports 4500 × 5400 transparent PNG</small>
+            </span>
+          </label>
+
+          <label class="slider-row indented">
+            <span>Padding <output id="paddingValue">300px</output></span>
+            <input type="range" id="paddingRange" min="0" max="1000" step="25" value="300" />
+          </label>
+
+          <fieldset class="placement-field indented">
+            <legend>Placement</legend>
+            <label>
+              <input type="radio" name="placement" value="top" checked />
+              <span>Top</span>
+            </label>
+            <label>
+              <input type="radio" name="placement" value="middle" />
+              <span>Middle</span>
+            </label>
+            <label>
+              <input type="radio" name="placement" value="bottom" />
+              <span>Bottom</span>
+            </label>
+          </fieldset>
+        </section>
+
+        <section class="panel-section" aria-labelledby="exportTitle">
+          <div class="section-heading">
+            <h2 id="exportTitle">Export</h2>
+            <span class="fixed-size">Gentle PNG reduce</span>
+          </div>
+
+          <label class="toggle-row">
+            <input type="checkbox" id="optimizePngToggle" checked />
+            <span>
+              <strong>Clean PNG</strong>
+              <small>Lightly reduces size without resizing art</small>
+            </span>
+          </label>
+        </section>
+
+        <section class="panel-section" aria-labelledby="previewTitle">
+          <h2 id="previewTitle">Preview Background</h2>
+          <div class="preview-options">
+            <label>
+              <input type="radio" name="previewBg" value="checker" checked />
+              <span>Transparent</span>
+            </label>
+            <label>
+              <input type="radio" name="previewBg" value="white" />
+              <span>White</span>
+            </label>
+            <label>
+              <input type="radio" name="previewBg" value="black" />
+              <span>Black</span>
+            </label>
+            <label>
+              <input type="radio" name="previewBg" value="custom" />
+              <span>Custom</span>
+            </label>
+          </div>
+          <label class="color-row">
+            <span>Color</span>
+            <input type="color" id="previewColor" value="#3f6f63" />
+          </label>
+        </section>
+
+        <div class="actions">
+          <button type="button" class="primary-button" id="processButton">Process images</button>
+          <button type="button" class="secondary-button" id="downloadZipButton" disabled>Download</button>
+        </div>
+      </aside>
+
+      <section class="workspace" aria-label="Image workspace">
+        <div class="status-bar">
+          <div>
+            <p class="eyebrow">Batch</p>
+            <h2 id="statusTitle">Ready for images</h2>
+          </div>
+          <div class="progress-wrap" aria-label="Processing progress">
+            <span id="progressText">0 files</span>
+            <div class="progress-track">
+              <div class="progress-fill" id="progressFill"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="main-grid">
+          <section class="preview-panel" aria-label="Selected image preview">
+            <div class="canvas-frame">
+              <div class="canvas-stage checker-bg" id="canvasFrame">
+                <div class="ruler ruler-top" aria-hidden="true">
+                  <span>0</span>
+                  <span>2250</span>
+                  <span>4500px</span>
+                </div>
+                <div class="ruler ruler-left" aria-hidden="true">
+                  <span>0</span>
+                  <span>2700</span>
+                  <span>5400px</span>
+                </div>
+                <img id="previewImage" alt="" />
+                <div class="empty-state" id="emptyState">
+                  <strong>No image selected</strong>
+                  <span>Upload a batch to preview the final PNG.</span>
+                </div>
+              </div>
+            </div>
+            <div class="preview-meta" id="previewMeta">
+              <span>Output: 4500 × 5400 PNG</span>
+              <span>Padding: 300px</span>
+            </div>
+          </section>
+
+          <section class="queue-panel" aria-label="Uploaded images">
+            <div class="section-heading">
+              <h2>Files</h2>
+              <button type="button" class="ghost-button" id="clearButton">Clear</button>
+            </div>
+            <div class="file-list" id="fileList">
+              <div class="queue-empty">Your uploaded images will appear here.</div>
+            </div>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <script src="app.js?v=20260619-gentle-reduce-6"></script>
+  </body>
+</html>
