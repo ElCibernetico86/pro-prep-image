@@ -1,17 +1,17 @@
 :root {
   color-scheme: dark;
-  --bg: #050806;
-  --surface: #0a100d;
-  --surface-2: #101b15;
-  --ink: #edfff5;
-  --muted: #89a796;
-  --line: #1d3a2c;
-  --accent: #39ff88;
-  --accent-strong: #b8ffd5;
-  --accent-soft: rgba(57, 255, 136, 0.12);
+  --bg: #000000;
+  --surface: #05070d;
+  --surface-2: #0b1220;
+  --ink: #eef7ff;
+  --muted: #8fb7d8;
+  --line: #1d4f91;
+  --accent: #00b7ff;
+  --accent-strong: #8fe8ff;
+  --accent-soft: rgba(0, 183, 255, 0.14);
   --warning: #ffcb66;
   --danger: #ff6e6e;
-  --shadow: 0 18px 60px rgba(0, 255, 128, 0.08);
+  --shadow: 0 18px 60px rgba(0, 105, 255, 0.16);
 }
 
 * {
@@ -106,7 +106,7 @@ button:disabled {
   display: grid;
   gap: 6px;
   padding: 22px;
-  border: 2px dashed #2f6f4f;
+  border: 2px dashed #1f62b8;
   border-radius: 8px;
   background: var(--surface-2);
   text-align: center;
@@ -321,8 +321,8 @@ input[type="color"] {
 .primary-button {
   border: 1px solid var(--accent-strong);
   background: var(--accent);
-  color: #041008;
-  box-shadow: 0 0 18px rgba(57, 255, 136, 0.28);
+  color: #00111f;
+  box-shadow: 0 0 18px rgba(0, 183, 255, 0.34);
 }
 
 .secondary-button {
@@ -372,14 +372,14 @@ input[type="color"] {
   height: 8px;
   overflow: hidden;
   border-radius: 999px;
-  background: #13251d;
+  background: #071a33;
 }
 
 .progress-fill {
   width: 0;
   height: 100%;
   background: var(--accent);
-  box-shadow: 0 0 14px rgba(57, 255, 136, 0.45);
+  box-shadow: 0 0 14px rgba(0, 183, 255, 0.5);
   transition: width 180ms ease;
 }
 
@@ -408,7 +408,7 @@ input[type="color"] {
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #020504;
+  background: #000000;
   padding: 6px;
 }
 
