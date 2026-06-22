@@ -5,7 +5,11 @@ const OUTPUT_SIZE_LIMIT_BYTES = 10_000_000;
 const OUTPUT_SIZE_SOFT_TARGET_BYTES = 8_500_000;
 const MAX_UPSCALED_DIMENSION = 12_000;
 const MAX_UPSCALED_PIXELS = 64_000_000;
-const APP_BUILD = "2026-06-19 gentle reduce 6";
+const APP_BUILD = "2026-06-22 upscale default 3";
+const PICA_UNSHARP_RADIUS = 0.6;
+const PICA_UNSHARP_THRESHOLD = 1;
+
+let picaResizer = null;
 
 const state = {
   files: [],
@@ -19,6 +23,8 @@ const elements = {
   dropZone: document.getElementById("dropZone"),
   upscaleToggle: document.getElementById("upscaleToggle"),
   upscaleFactor: document.getElementById("upscaleFactor"),
+  definitionRange: document.getElementById("definitionRange"),
+  definitionValue: document.getElementById("definitionValue"),
   removeBgToggle: document.getElementById("removeBgToggle"),
   toleranceRange: document.getElementById("toleranceRange"),
   toleranceValue: document.getElementById("toleranceValue"),
@@ -50,8 +56,9 @@ const elements = {
 };
 
 const defaultSettings = {
-  upscale: false,
-  upscaleFactor: 2,
+  upscale: true,
+  upscaleFactor: 4,
+  definition: 100,
   removeBackground: true,
   tolerance: 0,
   edgeCleanup: true,
@@ -68,6 +75,7 @@ function getSettings() {
   return {
     upscale: elements.upscaleToggle.checked,
     upscaleFactor: Number(elements.upscaleFactor.value),
+    definition: Number(elements.definitionRange.value),
     removeBackground: elements.removeBgToggle.checked,
     tolerance: Number(elements.toleranceRange.value),
     edgeCleanup: elements.edgeCleanupToggle.checked,
@@ -84,6 +92,7 @@ function getSettings() {
 function setSettings(settings) {
   elements.upscaleToggle.checked = settings.upscale;
   elements.upscaleFactor.value = String(settings.upscaleFactor);
+  elements.definitionRange.value = String(settings.definition);
   elements.removeBgToggle.checked = settings.removeBackground;
   elements.toleranceRange.value = String(settings.tolerance);
   elements.edgeCleanupToggle.checked = settings.edgeCleanup;
@@ -100,10 +109,12 @@ function setSettings(settings) {
 
 function syncControlLabels() {
   elements.toleranceValue.value = `${elements.toleranceRange.value}%`;
+  elements.definitionValue.value = `${elements.definitionRange.value}%`;
   elements.edgeTrimValue.value = elements.edgeTrimRange.value;
   elements.trimMarginValue.value = `${elements.trimMarginRange.value}px`;
   elements.paddingValue.value = `${elements.paddingRange.value}px`;
   elements.upscaleFactor.disabled = !elements.upscaleToggle.checked;
+  elements.definitionRange.disabled = false;
   elements.toleranceRange.disabled = !elements.removeBgToggle.checked;
   elements.edgeCleanupToggle.disabled = !elements.removeBgToggle.checked;
   elements.edgeTrimRange.disabled = !elements.removeBgToggle.checked || !elements.edgeCleanupToggle.checked;
@@ -129,6 +140,7 @@ function updatePreviewMeta() {
   const details = [
     `Output: ${outputWidth} × ${outputHeight} PNG`,
     `Quality: gentle reduce`,
+    `Definition: ${settings.definition}%`,
     `Padding: ${settings.padding}px`,
     `Placement: ${capitalize(settings.placement)}`,
   ];
@@ -244,6 +256,7 @@ function setupEvents() {
   const settingInputs = [
     elements.upscaleToggle,
     elements.upscaleFactor,
+    elements.definitionRange,
     elements.removeBgToggle,
     elements.toleranceRange,
     elements.edgeCleanupToggle,
@@ -501,14 +514,18 @@ async function processImage(file, settings) {
     if (scale > 1.01) {
       const nextWidth = Math.max(1, Math.round(source.width * scale));
       const nextHeight = Math.max(1, Math.round(source.height * scale));
-      source = resizeCanvas(source, nextWidth, nextHeight);
-      sharpenCanvas(source, 0.22);
+      source = await resizeCanvas(source, nextWidth, nextHeight, Math.round(settings.definition * 0.65));
     }
   }
   upscaledWidth = source.width;
   upscaledHeight = source.height;
 
-  const placementDetails = placeOnAmazonCanvas(source, settings.padding, settings.placement);
+  const placementDetails = await placeOnAmazonCanvas(
+    source,
+    settings.padding,
+    settings.placement,
+    settings.definition,
+  );
   const output = placementDetails.canvas;
   const placementBounds = getPlacementBounds(placementDetails);
   let optimizedPixels = settings.optimizePng ? normalizeTransparentPixels(output, placementBounds) : 0;
@@ -553,7 +570,48 @@ function createCanvas(width, height) {
   return canvas;
 }
 
-function resizeCanvas(source, targetWidth, targetHeight) {
+async function resizeCanvas(source, targetWidth, targetHeight, definition = 0) {
+  const resizer = getPicaResizer();
+  if (resizer) {
+    const canvas = createCanvas(targetWidth, targetHeight);
+    try {
+      await resizer.resize(source, canvas, {
+        filter: "mks2013",
+        unsharpAmount: definitionToUnsharpAmount(definition),
+        unsharpRadius: PICA_UNSHARP_RADIUS,
+        unsharpThreshold: PICA_UNSHARP_THRESHOLD,
+      });
+      return canvas;
+    } catch (error) {
+      console.warn("High-quality resize unavailable. Falling back to canvas resize.", error);
+    }
+  }
+
+  const canvas = resizeCanvasFallback(source, targetWidth, targetHeight);
+  if (definition > 0) {
+    enhanceCanvasDefinition(canvas, definition);
+  }
+  return canvas;
+}
+
+function getPicaResizer() {
+  if (typeof window.pica !== "function") return null;
+  if (!picaResizer) {
+    picaResizer = window.pica({
+      features: ["js", "wasm", "ww"],
+      tile: 1024,
+      idle: 4000,
+    });
+  }
+  return picaResizer;
+}
+
+function definitionToUnsharpAmount(definition) {
+  if (definition <= 0) return 0;
+  return Math.round(40 + clamp(definition, 0, 100) * 1.6);
+}
+
+function resizeCanvasFallback(source, targetWidth, targetHeight) {
   let current = source;
   while (current.width * 1.6 < targetWidth || current.height * 1.6 < targetHeight) {
     const width = Math.min(targetWidth, Math.round(current.width * 1.6));
@@ -570,6 +628,10 @@ function drawResized(source, width, height) {
   context.imageSmoothingQuality = "high";
   context.drawImage(source, 0, 0, width, height);
   return canvas;
+}
+
+function enhanceCanvasDefinition(canvas, definition) {
+  sharpenCanvas(canvas, 0.08 + clamp(definition, 0, 100) * 0.0032);
 }
 
 function sharpenCanvas(canvas, amount) {
@@ -824,7 +886,7 @@ function trimTransparentPixels(source, margin) {
   return trimmed;
 }
 
-function placeOnAmazonCanvas(source, padding, placement) {
+async function placeOnAmazonCanvas(source, padding, placement, definition) {
   const output = createCanvas(CANVAS_WIDTH, CANVAS_HEIGHT);
   const context = output.getContext("2d");
   context.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
@@ -843,9 +905,15 @@ function placeOnAmazonCanvas(source, padding, placement) {
     y = Math.round(CANVAS_HEIGHT - padding - height);
   }
 
-  context.imageSmoothingEnabled = true;
-  context.imageSmoothingQuality = "high";
-  context.drawImage(source, x, y, width, height);
+  let placedSource = source;
+  if (source.width !== width || source.height !== height) {
+    placedSource = await resizeCanvas(source, width, height, definition);
+  } else if (definition > 0) {
+    placedSource = cloneCanvas(source);
+    enhanceCanvasDefinition(placedSource, definition);
+  }
+
+  context.drawImage(placedSource, x, y);
   return {
     canvas: output,
     placedWidth: width,

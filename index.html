@@ -32,18 +32,22 @@
           </div>
 
           <label class="toggle-row">
-            <input type="checkbox" id="upscaleToggle" />
+            <input type="checkbox" id="upscaleToggle" checked />
             <span>
               <strong>Upscale</strong>
-              <small>Browser resize before cleanup</small>
+              <small>Sharper non-AI resize</small>
             </span>
           </label>
           <label class="field-row indented">
             <span>Scale</span>
             <select id="upscaleFactor">
               <option value="2">2x</option>
-              <option value="4">4x</option>
+              <option value="4" selected>4x</option>
             </select>
+          </label>
+          <label class="slider-row indented">
+            <span>Definition <output id="definitionValue">100%</output></span>
+            <input type="range" id="definitionRange" min="0" max="100" step="1" value="100" />
           </label>
 
           <label class="toggle-row">
@@ -220,6 +224,7 @@
       </section>
     </main>
 
-    <script src="app.js?v=20260619-gentle-reduce-6"></script>
+    <script src="pica.min.js?v=10.0.0"></script>
+    <script src="app.js?v=20260622-upscale-default-3"></script>
   </body>
 </html>
