@@ -1,15 +1,16 @@
 const CANVAS_WIDTH = 4500;
 const CANVAS_HEIGHT = 5400;
-const OUTPUT_SUFFIX = "_4500x5400";
+const OUTPUT_SEQUENCE_STORAGE_KEY = "pro-prep-image-next-output-number";
 const OUTPUT_SIZE_LIMIT_BYTES = 10_000_000;
 const OUTPUT_SIZE_SOFT_TARGET_BYTES = 8_500_000;
 const MAX_UPSCALED_DIMENSION = 12_000;
 const MAX_UPSCALED_PIXELS = 64_000_000;
-const APP_BUILD = "2026-06-22 blue theme 4";
+const APP_BUILD = "2026-06-30 persistent numbering 2";
 const PICA_UNSHARP_RADIUS = 0.6;
 const PICA_UNSHARP_THRESHOLD = 1;
 
 let picaResizer = null;
+let fallbackNextOutputNumber = 1;
 
 const state = {
   files: [],
@@ -305,10 +306,9 @@ function reloadLatestBuild() {
   clearFiles();
   setSettings(defaultSettings);
   try {
-    localStorage.clear();
     sessionStorage.clear();
   } catch (error) {
-    // Some file:// contexts block storage access. Reloading still refreshes the app code.
+    // Some file:// contexts block session storage. Reloading still refreshes the app code.
   }
   const nextUrl = new URL(window.location.href);
   nextUrl.searchParams.set("appReset", Date.now().toString());
@@ -319,11 +319,10 @@ async function addFiles(fileList) {
   const files = Array.from(fileList).filter((file) => file.type.startsWith("image/"));
   if (!files.length) return;
 
-  const usedOutputNames = new Set(state.files.map((item) => item.outputName));
-  const addedItems = files.map((file) => {
+  const firstOutputNumber = reserveOutputNumbers(files.length);
+  const addedItems = files.map((file, index) => {
     const id = crypto.randomUUID();
-    const outputName = makeUniqueOutputName(file.name, usedOutputNames);
-    usedOutputNames.add(outputName);
+    const outputName = makeOutputName(firstOutputNumber + index);
     return {
       id,
       file,
@@ -359,32 +358,35 @@ async function addFiles(fileList) {
   await processAll();
 }
 
-function makeOutputName(name) {
-  const dotIndex = name.lastIndexOf(".");
-  const base = dotIndex > 0 ? name.slice(0, dotIndex) : name;
-  return `${sanitizeFilename(base)}${OUTPUT_SUFFIX}.png`;
+function makeOutputName(number) {
+  return `${String(number).padStart(4, "0")}.png`;
 }
 
-function makeUniqueOutputName(name, usedNames) {
-  const outputName = makeOutputName(name);
-  if (!usedNames.has(outputName)) return outputName;
+function reserveOutputNumbers(count) {
+  const firstOutputNumber = readNextOutputNumber();
+  const nextOutputNumber = firstOutputNumber + count;
+  fallbackNextOutputNumber = nextOutputNumber;
 
-  const dotIndex = outputName.lastIndexOf(".");
-  const base = dotIndex > 0 ? outputName.slice(0, dotIndex) : outputName;
-  const extension = dotIndex > 0 ? outputName.slice(dotIndex) : "";
-  let index = 2;
-  let candidate = `${base}_${index}${extension}`;
-
-  while (usedNames.has(candidate)) {
-    index += 1;
-    candidate = `${base}_${index}${extension}`;
+  try {
+    localStorage.setItem(OUTPUT_SEQUENCE_STORAGE_KEY, String(nextOutputNumber));
+  } catch (error) {
+    // Keep numbering unique for this open session when persistent storage is unavailable.
   }
 
-  return candidate;
+  return firstOutputNumber;
 }
 
-function sanitizeFilename(name) {
-  return name.trim().replace(/[\\/:*?"<>|]+/g, "-") || "image";
+function readNextOutputNumber() {
+  try {
+    const storedNumber = Number(localStorage.getItem(OUTPUT_SEQUENCE_STORAGE_KEY));
+    if (Number.isSafeInteger(storedNumber) && storedNumber >= 1) {
+      fallbackNextOutputNumber = Math.max(fallbackNextOutputNumber, storedNumber);
+    }
+  } catch (error) {
+    // Fall back to the in-memory sequence for browsers that block local storage.
+  }
+
+  return fallbackNextOutputNumber;
 }
 
 async function processAll() {
